@@ -1,0 +1,167 @@
+﻿@page "/locations"
+@inject ILocationService LocationService
+@inject IJSRuntime JS
+@using Locations_Frontend.Services
+
+
+<h3>Locations</h3>
+
+<hr />
+
+<!-- Formulario para agregar una ubicación -->
+<div class="mb-3">
+    <input class="form-control mb-2" placeholder="Número" @bind="newLocation.Number" />
+    <input class="form-control mb-2" placeholder="N° Ubicación" @bind="newLocation.LocationNumber" />
+    <input class="form-control mb-2" type="number" placeholder="Piso" @bind="newLocation.FloorNumber" />
+    <input class="form-control mb-2" type="number" placeholder="Metros cuadrados" @bind="newLocation.SquareMeters" />
+    <input class="form-control mb-2" placeholder="Observaciones" @bind="newLocation.Observation" />
+    <select class="form-control mb-2" @bind="newLocation.LocalTypeId">
+        <option value="0">-- Tipo de Local --</option>
+        @foreach (var item in LocalType)
+        {
+            <option value="@item.Id">@item.Description</option>
+        }
+    </select>
+
+    <select class="form-control mb-2" @bind="newLocation.LocationClassId">
+        <option value="0">-- Clase --</option>
+        @foreach (var item in LocationClasses)
+        {
+            <option value="@item.Id">@item.Name</option>
+        }
+    </select>
+
+    <select class="form-control mb-2" @bind="newLocation.LocalityId">
+        <option value="0">-- Localidad --</option>
+        @foreach (var item in Locality)
+        {
+            <option value="@item.Id">@item.Name</option>
+        }
+    </select>
+
+    <select class="form-control mb-2" @bind="newLocation.LocalStateId">
+        <option value="0">-- Estado --</option>
+        @foreach (var item in LocalState)
+        {
+            <option value="@item.Id">@item.Description</option>
+        }
+    </select>
+
+    <button class="btn btn-primary" @onclick="CreateLocation">Agregar</button>
+</div>
+
+<hr />
+
+<!-- Tabla de resultados -->
+@if (locations is null)
+{
+    <p><em>Cargando...</em></p>
+}
+else if (!locations.Any())
+{
+    <p>No hay registros.</p>
+}
+else
+{
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Número</th>
+                <th>Ubicación</th>
+                <th>Piso</th>
+                <th>m²</th>
+                <th>Observación</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var loc in locations)
+            {
+                <tr>
+                    <td>@loc.Id</td>
+                    <td>@loc.Number</td>
+                    <td>@loc.LocationNumber</td>
+                    <td>@loc.FloorNumber</td>
+                    <td>@loc.SquareMeters</td>
+                    <td>@loc.Observation</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" @onclick="() => DeleteLocation(loc.Id)">Eliminar</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    List<Location> locations = new();
+    List<LocalType> LocalType = new();
+    List<LocationClass> LocationClasses = new();
+    List<Locality> Locality = new();
+    List<LocalState> LocalState = new();
+    Location newLocation = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        locations = await LocationService.GetLocations();
+        LocalType = await LocationService.GetLocalTypes();
+        LocationClasses = await LocationService.GetLocationClasses();
+        Locality = await LocationService.GetLocalities();
+        LocalState = await LocationService.GetLocalStates();
+    }
+
+    async Task CreateLocation()
+    {
+        if (string.IsNullOrWhiteSpace(newLocation.Number) ||
+            string.IsNullOrWhiteSpace(newLocation.LocationNumber) ||
+            newLocation.FloorNumber <= 0 ||
+            newLocation.SquareMeters <= 0 ||
+            newLocation.LocalTypeId <= 0 ||
+            newLocation.LocalStateId <= 0 ||
+            newLocation.LocalityId <= 0 ||
+            newLocation.LocationClassId <= 0)
+        {
+            await JS.InvokeVoidAsync("Swal.fire", new
+            {
+                icon = "warning",
+                title = "Datos incompletos",
+                text = "Completa todos los campos antes de guardar."
+            });
+            return;
+        }
+
+        try
+        {
+            await LocationService.CreateLocation(newLocation);
+
+            await JS.InvokeVoidAsync("Swal.fire", new
+            {
+                icon = "success",
+                title = "¡Guardado!",
+                text = "Ubicación registrada correctamente",
+                timer = 1800,
+                showConfirmButton = false
+            });
+
+            newLocation = new Location();
+            locations = await LocationService.GetLocations();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("Swal.fire", new
+            {
+                icon = "error",
+                title = "Error",
+                text = $"Hubo un problema al guardar: {ex.Message}"
+            });
+        }
+    }
+
+    async Task DeleteLocation(int id)
+    {
+        await LocationService.DeleteLocation(id);
+        locations = await LocationService.GetLocations();
+    }
+
+}
